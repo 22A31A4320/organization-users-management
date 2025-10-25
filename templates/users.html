@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Users - OrgUserApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light px-3">
+      <a class="navbar-brand" href="/">OrgUserApp</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="/organizations">Organizations</a></li>
+          <li class="nav-item"><a class="nav-link active" href="/users">Users</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Users</h2>
+        <div>
+          <input id="searchUser" class="form-control d-inline-block me-2" style="width:220px;" placeholder="Search users...">
+          <button class="btn btn-primary" id="btnAddUser" data-bs-toggle="modal" data-bs-target="#addUserModal">Add user</button>
+        </div>
+      </div>
+
+      <div id="alertArea"></div>
+      <div id="userTableArea" class="table-responsive">
+        <div class="text-center py-4" id="loadingUsers">Loading users...</div>
+      </div>
+
+      <!-- Add User Modal -->
+      <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <form id="addUserForm">
+              <div class="modal-header">
+                <h5 class="modal-title">Add User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-2">
+                  <label class="form-label">Name</label>
+                  <input name="name" class="form-control" required>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Email</label>
+                  <input name="email" type="email" class="form-control" required>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Organization</label>
+                  <select name="org_id" id="orgSelect" class="form-select" required></select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Role</label>
+                  <select name="role" class="form-select" required>
+                    <option>Admin</option>
+                    <option>Co-ordinator</option>
+                    <option>Viewer</option>
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Phone</label>
+                  <input name="phone" class="form-control">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Timezone</label>
+                  <input name="timezone" class="form-control" value="Asia/Kolkata">
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancel</button>
+                <button class="btn btn-primary" type="submit">Add User</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const userTableArea = document.getElementById('userTableArea');
+      const loadingUsers = document.getElementById('loadingUsers');
+      const alertArea = document.getElementById('alertArea');
+
+      function showAlert(msg, type='success', timeout=4000){
+        alertArea.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+        if(timeout) setTimeout(()=> alertArea.innerHTML = '', timeout);
+      }
+
+      async function loadUsers(q=''){
+        loadingUsers.style.display = 'block';
+        userTableArea.innerHTML = '';
+        try{
+          const url = q ? `/api/users/search?q=${encodeURIComponent(q)}` : '/api/users';
+          const res = await fetch(url);
+          if(!res.ok) throw new Error('Failed to fetch');
+          const data = await res.json();
+          loadingUsers.style.display = 'none';
+          renderUsersTable(data);
+        }catch(e){
+          loadingUsers.style.display = 'none';
+          userTableArea.innerHTML = '<div class="alert alert-danger">Could not load users.</div>';
+        }
+      }
+
+      function renderUsersTable(users){
+        if(users.length === 0){
+          userTableArea.innerHTML = '<div class="alert alert-info">No users found.</div>';
+          return;
+        }
+        let html = `<table class="table table-bordered align-middle">
+          <thead class="table-light"><tr>
+            <th>#</th><th>User</th><th>Organization</th><th>Role</th><th>Action</th>
+          </tr></thead><tbody>`;
+        users.forEach((u, idx) => {
+          html += `<tr>
+            <td>${idx+1}</td>
+            <td><strong>${escapeHtml(u.name)}</strong><br/><small>${escapeHtml(u.email)}</small></td>
+            <td>${escapeHtml(u.organization_name || '—')}</td>
+            <td>${escapeHtml(u.role)}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" onclick="viewUser(${u.id})">Profile</button>
+            </td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        userTableArea.innerHTML = html;
+      }
+
+      function escapeHtml(s){ if(!s) return ''; return s.toString().replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+      async function viewUser(id){
+        try{
+          const res = await fetch('/api/users');
+          if(!res.ok) throw new Error('Failed');
+          const users = await res.json();
+          const user = users.find(u => u.id === id);
+          if(!user) { showAlert('User not found','danger'); return; }
+          const modalHtml = `<div class="modal fade" id="viewUserModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">${escapeHtml(user.name)}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <p><strong>Email:</strong> ${escapeHtml(user.email)}</p>
+              <p><strong>Organization:</strong> ${escapeHtml(user.organization_name || '')}</p>
+              <p><strong>Role:</strong> ${escapeHtml(user.role)}</p>
+              <p><strong>Phone:</strong> ${escapeHtml(user.phone||'')}</p>
+              <p><strong>Timezone:</strong> ${escapeHtml(user.timezone||'')}</p>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+          </div></div></div>`;
+          document.body.insertAdjacentHTML('beforeend', modalHtml);
+          const modalEl = document.getElementById('viewUserModal');
+          const bsModal = new bootstrap.Modal(modalEl);
+          modalEl.addEventListener('hidden.bs.modal', ()=> modalEl.remove());
+          bsModal.show();
+        }catch(e){
+          showAlert('Failed to load user', 'danger');
+        }
+      }
+
+      // populate org select
+      async function loadOrgOptions(){
+        const sel = document.getElementById('orgSelect');
+        sel.innerHTML = '<option>Loading...</option>';
+        try{
+          const res = await fetch('/api/organizations');
+          const list = await res.json();
+          sel.innerHTML = list.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+        }catch(e){
+          sel.innerHTML = '<option value="">Failed to load</option>';
+        }
+      }
+
+      // add user form
+      document.getElementById('addUserForm').addEventListener('submit', async (ev)=>{
+        ev.preventDefault();
+        const data = Object.fromEntries(new FormData(ev.target).entries());
+        try{
+          const res = await fetch('/api/users', {
+            method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+          });
+          if(!res.ok){
+            const err = await res.json();
+            throw new Error(err.error || 'Could not create user');
+          }
+          showAlert('User added successfully');
+          const modalEl = bootstrap.Modal.getInstance(document.getElementById('addUserModal'));
+          modalEl.hide();
+          ev.target.reset();
+          loadUsers();
+        }catch(e){
+          showAlert(e.message || 'Error adding user','danger');
+        }
+      });
+
+      document.getElementById('searchUser').addEventListener('input', (e)=>{
+        const v = e.target.value.trim();
+        loadUsers(v);
+      });
+
+      // init
+      loadOrgOptions();
+      loadUsers();
+    </script>
+  </body>
+</html>

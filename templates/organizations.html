@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Organizations - OrgUserApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light px-3">
+      <a class="navbar-brand" href="/">OrgUserApp</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link active" href="/organizations">Organizations</a></li>
+          <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Manage B2B organizations</h2>
+        <div>
+          <input id="search" class="form-control d-inline-block me-2" style="width: 220px;" placeholder="Search orgs...">
+          <button class="btn btn-primary" id="btnAddOrg" data-bs-toggle="modal" data-bs-target="#addOrgModal">Add organization</button>
+        </div>
+      </div>
+
+      <div id="alertArea"></div>
+
+      <div id="tableArea" class="table-responsive">
+        <div class="text-center py-4" id="loading">Loading organizations...</div>
+      </div>
+
+      <!-- Add Org Modal -->
+      <div class="modal fade" id="addOrgModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <form id="addOrgForm">
+              <div class="modal-header">
+                <h5 class="modal-title">Add Organization</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Name</label>
+                    <input name="name" class="form-control" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Slug</label>
+                    <input name="slug" class="form-control" required placeholder="gitam">
+                    <div class="form-text">Unique identifier used in URLs (no spaces).</div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Support Email</label>
+                    <input name="support_email" type="email" class="form-control">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Phone</label>
+                    <input name="phone" class="form-control">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Alternative Phone</label>
+                    <input name="alt_phone" class="form-control">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Website</label>
+                    <input name="website" class="form-control">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Max Coordinators</label>
+                    <input name="max_coordinators" type="number" class="form-control" value="5" min="1">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Timezone</label>
+                    <input name="timezone" class="form-control" value="Asia/Kolkata">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Language</label>
+                    <select name="language" class="form-select">
+                      <option>English</option><option>Hindi</option><option>Telugu</option><option>Marathi</option>
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Pending Requests</label>
+                    <input name="pending_requests" type="number" class="form-control" value="0" min="0">
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancel</button>
+                <button class="btn btn-primary" type="submit">Add</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const tableArea = document.getElementById('tableArea');
+      const loading = document.getElementById('loading');
+      const alertArea = document.getElementById('alertArea');
+
+      function showAlert(msg, type='success', timeout=4000){
+        alertArea.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+        if(timeout) setTimeout(()=> alertArea.innerHTML = '', timeout);
+      }
+
+      async function loadOrgs(q=''){
+        loading.style.display = 'block';
+        tableArea.innerHTML = '';
+        try {
+          const url = q ? `/api/organizations/search?q=${encodeURIComponent(q)}` : '/api/organizations';
+          const res = await fetch(url);
+          if(!res.ok) throw new Error('Failed to fetch');
+          const data = await res.json();
+          loading.style.display = 'none';
+          renderTable(data);
+        } catch (e) {
+          loading.style.display = 'none';
+          tableArea.innerHTML = '<div class="alert alert-danger">Could not load organizations.</div>';
+        }
+      }
+
+      function renderTable(orgs){
+        if(orgs.length === 0){
+          tableArea.innerHTML = '<div class="alert alert-info">No organizations found.</div>';
+          return;
+        }
+        let html = `<table class="table table-bordered align-middle">
+          <thead class="table-light"><tr>
+            <th>#</th><th>Organization</th><th>Pending requests</th><th>Status</th><th>Action</th>
+          </tr></thead><tbody>`;
+        orgs.forEach((o, idx) => {
+          html += `<tr>
+            <td>${idx+1}</td>
+            <td>
+              <strong>${escapeHtml(o.name)}</strong><br/>
+              <small>${escapeHtml(o.website || '')} • ${escapeHtml(o.support_email || '')}</small>
+            </td>
+            <td>${o.pending_requests}</td>
+            <td>${escapeHtml(o.status)}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary me-1" onclick="viewOrg(${o.id})">Profile</button>
+              <div class="btn-group">
+                <button class="btn btn-sm btn-secondary" onclick="changeStatus(${o.id}, '${o.status==='Active'?'Blocked':'Active'}')">Change status</button>
+              </div>
+            </td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        tableArea.innerHTML = html;
+      }
+
+      function escapeHtml(s){ if(!s) return ''; return s.toString().replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+      async function viewOrg(id){
+        try{
+          const res = await fetch(`/api/organizations/${id}`);
+          if(!res.ok) throw new Error('Not found');
+          const o = await res.json();
+          const modalHtml = `
+            <div class="modal fade" id="viewOrgModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">${escapeHtml(o.name)}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <p><strong>Slug:</strong> ${escapeHtml(o.slug)}</p>
+              <p><strong>Support Email:</strong> ${escapeHtml(o.support_email||'')}</p>
+              <p><strong>Phone:</strong> ${escapeHtml(o.phone||'')}</p>
+              <p><strong>Website:</strong> ${escapeHtml(o.website||'')}</p>
+              <p><strong>Pending Requests:</strong> ${o.pending_requests}</p>
+              <p><strong>Status:</strong> ${escapeHtml(o.status)}</p>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+            </div></div></div>`;
+          document.body.insertAdjacentHTML('beforeend', modalHtml);
+          const modalEl = document.getElementById('viewOrgModal');
+          const bsModal = new bootstrap.Modal(modalEl);
+          modalEl.addEventListener('hidden.bs.modal', ()=> modalEl.remove());
+          bsModal.show();
+        }catch(e){
+          showAlert('Could not load organization details', 'danger');
+        }
+      }
+
+      async function changeStatus(id, newStatus){
+        try{
+          const resp = await fetch(`/api/organizations/${id}/status`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status: newStatus})
+          });
+          if(!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || 'Failed');
+          }
+          const updated = await resp.json();
+          showAlert(`Status changed to ${updated.status}`);
+          loadOrgs();
+        }catch(e){
+          showAlert('Failed to change status', 'danger');
+        }
+      }
+
+      // Add organization form submit
+      document.getElementById('addOrgForm').addEventListener('submit', async (ev)=>{
+        ev.preventDefault();
+        const form = ev.target;
+        const data = Object.fromEntries(new FormData(form).entries());
+        try{
+          const res = await fetch('/api/organizations', {
+            method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+          });
+          if(!res.ok){
+            const err = await res.json();
+            throw new Error(err.error || 'Could not create');
+          }
+          const created = await res.json();
+          showAlert('Organization added successfully');
+          // hide modal
+          const modalEl = bootstrap.Modal.getInstance(document.getElementById('addOrgModal'));
+          modalEl.hide();
+          form.reset();
+          loadOrgs();
+        }catch(e){
+          showAlert(e.message || 'Error adding organization', 'danger');
+        }
+      });
+
+      // search
+      document.getElementById('search').addEventListener('input', (e)=>{
+        const v = e.target.value.trim();
+        loadOrgs(v);
+      });
+
+      // initial load
+      loadOrgs();
+    </script>
+  </body>
+</html>

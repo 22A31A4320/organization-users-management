@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OrgUser Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light px-3">
+      <a class="navbar-brand" href="/">OrgUserApp</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="/organizations">Organizations</a></li>
+          <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <div class="row">
+        <div class="col-md-8">
+          <h1 class="mb-3">Dashboard</h1>
+          <p class="lead">Manage B2B organizations & users. Use the top menu to navigate to Organizations or Users pages.</p>
+        </div>
+        <div class="col-md-4">
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">Quick actions</h5>
+              <p class="card-text">Add organization or user from their respective pages.</p>
+              <a href="/organizations" class="btn btn-primary btn-sm me-2">Organizations</a>
+              <a href="/users" class="btn btn-secondary btn-sm">Users</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr/>
+      <div id="stats" class="row gy-3"></div>
+    </main>
+
+    <script>
+      // load quick stats (number of orgs, users)
+      async function loadStats(){
+        const container = document.getElementById('stats');
+        container.innerHTML = '<div class="text-center py-4">Loading stats...</div>';
+        try{
+          const [orgsResp, usersResp] = await Promise.all([
+            fetch('/api/organizations'),
+            fetch('/api/users')
+          ]);
+          const orgs = await orgsResp.json();
+          const users = await usersResp.json();
+          container.innerHTML = `
+            <div class="col-md-6">
+              <div class="card p-3">
+                <h5>Total Organizations</h5>
+                <h2>${orgs.length}</h2>
+                <small>Active / Blocked / Inactive supported</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card p-3">
+                <h5>Total Users</h5>
+                <h2>${users.length}</h2>
+                <small>Admins, Coordinators, etc.</small>
+              </div>
+            </div>
+          `;
+        }catch(e){
+          container.innerHTML = '<div class="alert alert-danger">Could not load stats.</div>'
+        }
+      }
+      loadStats();
+    </script>
+  </body>
+</html>
